@@ -472,7 +472,7 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
 
                                         <div class="flex gap-1.5 shrink-0">
                                             <a href="admin.php?tab=produk&edit=<?= (int) $prd['id'] ?>" class="bg-sky-500/20 text-sky-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg">✏️ Edit</a>
-                                            <a href="admin.php?tab=produk&hapus=<?= (int) $prd['id'] ?>" onclick="return confirm('Hapus produk ini?')" class="bg-red-500/20 text-red-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg">🗑️ Hapus</a>
+                                            <button type="button" onclick="bukaModalHapus(<?= (int) $prd['id'] ?>, '<?= htmlspecialchars($prd['nama'], ENT_QUOTES) ?>')" class="bg-red-500/20 text-red-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg hover:bg-red-500/30 transition">🗑️ Hapus</button>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -483,6 +483,22 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
             </div>
         <?php endif; ?>
     </main>
+
+    <!-- Modal Konfirmasi Hapus Kustom -->
+    <div id="modalHapus" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-3xl max-w-xs w-full p-6 text-center shadow-2xl transform scale-95 transition-transform duration-200" id="modalHapusKonten">
+            <div class="w-12 h-12 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center text-xl mx-auto mb-3">
+                ⚠️
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Hapus Produk?</h3>
+            <p class="text-xs text-slate-400 mb-5" id="teksNamaProduk">Produk yang dihapus tidak dapat dikembalikan.</p>
+            
+            <div class="flex gap-2">
+                <button type="button" onclick="tutupModalHapus()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold py-2.5 rounded-xl transition">Batal</button>
+                <a id="btnKonfirmasiHapus" href="#" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-lg shadow-red-500/20 flex items-center justify-center">Ya, Hapus</a>
+            </div>
+        </div>
+    </div>
 
     <?php if ($tab == 'pesanan'): ?>
     <script>
@@ -605,5 +621,28 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
         }
     </script>
     <?php endif; ?>
+
+    <script>
+        function bukaModalHapus(id, namaProduk) {
+            const modal = document.getElementById('modalHapus');
+            const konten = document.getElementById('modalHapusKonten');
+            const btnHapus = document.getElementById('btnKonfirmasiHapus');
+            const teks = document.getElementById('teksNamaProduk');
+
+            teks.innerHTML = `Hapus produk <b class="text-white">"${namaProduk}"</b> dari daftar?`;
+            btnHapus.href = `admin.php?tab=produk&hapus=${id}`;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => konten.classList.remove('scale-95'), 10);
+        }
+
+        function tutupModalHapus() {
+            const modal = document.getElementById('modalHapus');
+            const konten = document.getElementById('modalHapusKonten');
+            
+            konten.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 150);
+        }
+    </script>
 </body>
 </html>
