@@ -500,15 +500,15 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
         </div>
     </div>
 
-    <?php if ($tab == 'pesanan'): ?>
+    <!-- SCRIPT GLOBAL AUDIO ALARM (Dikeluarkan agar bisa diakses dari semua tab) -->
     <script>
-        let lastPendingCount = -1;
         let audioCtx = null;
 
         function aktifkanAudio() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             mainkanAlarmKeras();
-            document.getElementById('btn-audio').style.display = 'none';
+            const btnAudio = document.getElementById('btn-audio');
+            if (btnAudio) btnAudio.style.display = 'none';
             alert('✅ Berhasil! Alarm nyaring siap.');
         }
 
@@ -529,6 +529,11 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                 osc.stop(now + (i * 0.2) + 0.15);
             }
         }
+    </script>
+
+    <?php if ($tab == 'pesanan'): ?>
+    <script>
+        let lastPendingCount = -1;
 
         function ambilPesanan() {
             fetch('api.php?aksi=ambil_pesanan')
