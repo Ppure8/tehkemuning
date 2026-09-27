@@ -55,13 +55,13 @@ foreach ($produk as$p) {
     <header class="bg-brand-800 text-white px-5 pt-5 pb-6 rounded-b-[2rem] shadow-lg sticky top-0 z-20">
         <div class="flex justify-between items-start gap-3">
             <div>
-                <span class="inline-flex items-center bg-white/10 px-3 py-1 rounded-full text-[11px] font-medium">📍 Antar ke Rumah Warga</span>
+                <span class="inline-flex items-center bg-white/10 px-3 py-1 rounded-full text-[11px] font-medium">📍 Perum Panghegar</span>
                 <h1 class="font-serif text-2xl font-semibold mt-2 leading-tight">Es Teh Kemuning</h1>
                 <p class="text-xs text-white/60 mt-0.5">Diseduh segar, diantar hangat ke depan pintu</p>
             </div>
-            <div class="bg-white/10 p-2.5 rounded-2xl backdrop-blur-md shrink-0">
-                <span class="text-2xl">🧋</span>
-            </div>
+            <div class="bg-white/10 p-2 rounded-2xl backdrop-blur-md flex items-center justify-center">
+    <img src="logo.png" alt="Logo Es Teh Kemuning" class="w-12 h-12 object-contain">
+</div>
         </div>
     </header>
 
