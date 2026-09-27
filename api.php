@@ -2,12 +2,19 @@
 include 'koneksi.php';
 $aksi = $_GET['aksi'] ?? '';
 
+// Penyesuaian ketersediaan koneksi database ($pdo atau $db)
+if (!isset($db) && isset($pdo)) {
+    $db = $pdo;
+} elseif (!isset($pdo) && isset($db)) {
+    $pdo = $db;
+}
+
 if ($aksi == 'simpan') {
     $data = json_decode(file_get_contents('php://input'), true);
     $nama = $data['nama'] ?? '';
     $no_rumah = $data['no_rumah'] ?? '';
     $no_hp = $data['no_hp'] ?? '';
-    $catatan = $data['catatan'] ?? ''; // <-- Menangkap data catatan dari pembeli
+    $catatan = $data['catatan'] ?? '';
     $items = $data['items'] ?? [];
 
     $total = 0;
@@ -27,7 +34,8 @@ if ($aksi == 'simpan') {
         $stmtDetail->execute([$pesanan_id, $nama_menu, $val['jumlah'], $subtotal]);
     }
 
-    echo json_encode(['status' => 'sukses']);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'sukses', 'pesanan_id' => $pesanan_id]);
 } 
 elseif ($aksi == 'ambil_pesanan') {
     $stmt = $db->query("SELECT * FROM pesanan ORDER BY id DESC LIMIT 20");
@@ -46,10 +54,16 @@ elseif ($aksi == 'ambil_pesanan') {
     echo json_encode($pesanan);
 } 
 elseif ($aksi == 'update_status') {
-    $id = $_GET['id'] ?? 0;
+    $id = (int) ($_GET['id'] ?? 0);
     $status = $_GET['status'] ?? '';
-    $stmt = $db->prepare("UPDATE pesanan SET status = ? WHERE id = ?");
-    $stmt->execute([$status, $id]);
-    echo json_encode(['status' => 'sukses']);
+    
+    // Status yang diizinkan agar aman
+    if ($id > 0 && in_array($status, ['Diproses', 'Selesai', 'Diterima'])) {
+        $stmt = $db->prepare("UPDATE pesanan SET status = ? WHERE id = ?");
+        $stmt->execute([$status, $id]);
+        echo json_encode(['status' => 'sukses']);
+    } else {
+        echo json_encode(['status' => 'gagal', 'pesan' => 'Parameter tidak valid']);
+    }
 }
 ?>

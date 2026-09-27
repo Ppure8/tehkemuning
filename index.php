@@ -1,18 +1,20 @@
 <?php
 include 'koneksi.php';
 
-$produk = [];$pesanMuatProduk = '';
+$produk = [];
+$pesanMuatProduk = '';
 try {
-    $stmtProduk =$db->query("SELECT * FROM produk ORDER BY kategori, nama");
-    $produk =$stmtProduk->fetchAll(PDO::FETCH_ASSOC);
-} catch (\Throwable $e) {$pesanMuatProduk = 'Menu sedang tidak bisa dimuat. Silakan refresh halaman ini.';
+    $stmtProduk = $pdo->query("SELECT * FROM produk ORDER BY kategori, nama");
+    $produk = $stmtProduk->fetchAll(PDO::FETCH_ASSOC);
+} catch (\Throwable $e) {
+    $pesanMuatProduk = 'Menu sedang tidak bisa dimuat. Silakan refresh halaman ini.';
 }
 
 $daftarKategori = [];
-foreach ($produk as$p) {
-    $kat =$p['kategori'] ?: 'Lainnya';
-    if (!in_array($kat,$daftarKategori, true)) {
-        $daftarKategori[] =$kat;
+foreach ($produk as $p) {
+    $kat = $p['kategori'] ?: 'Lainnya';
+    if (!in_array($kat, $daftarKategori, true)) {
+        $daftarKategori[] = $kat;
     }
 }
 ?>
@@ -51,6 +53,17 @@ foreach ($produk as$p) {
 </head>
 <body class="bg-paper text-ink-900 pb-24">
 
+    <!-- Toast Notifikasi Custom Bergaya Premium -->
+    <div id="toast-notif" class="fixed top-6 left-1/2 -translate-x-1/2 z-[70] hidden transition-all duration-500 transform -translate-y-10 opacity-0 pointer-events-none w-max max-w-[90vw]">
+        <div class="bg-brand-900 backdrop-blur-md px-5 py-3.5 rounded-2xl shadow-2xl border border-brand-700 flex items-center gap-3">
+            <div id="toast-icon" class="text-2xl shrink-0 bg-white/10 w-10 h-10 flex items-center justify-center rounded-full">🔔</div>
+            <div>
+                <h4 id="toast-title" class="font-serif font-bold text-sm text-white">Pemberitahuan</h4>
+                <p id="toast-message" class="text-xs text-brand-100 mt-0.5">Pesan notifikasi di sini.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-brand-800 text-white px-5 pt-5 pb-6 rounded-b-[2rem] shadow-lg sticky top-0 z-20">
         <div class="flex justify-between items-start gap-3">
@@ -67,6 +80,24 @@ foreach ($produk as$p) {
 
     <!-- Daftar Produk -->
     <main class="p-4 pt-5 max-w-md mx-auto">
+        
+        <!-- ================= BANNER LIVE TRACKING ================= -->
+        <div id="banner-tracking" class="hidden mb-5 bg-brand-100 border border-brand-800/20 p-4 rounded-2xl shadow-sm flex items-center justify-between transition-all">
+            <div>
+                <p class="text-[10px] text-brand-800 font-bold uppercase tracking-wider mb-0.5">STATUS PESANAN ANDA 🎉</p>
+                <p class="text-xs text-ink-500">Atas nama: <span id="track-nama" class="font-bold text-ink-900"></span></p>
+                <div class="mt-2 flex items-center gap-2">
+                    <span class="relative flex h-3 w-3">
+                      <span id="ping-dot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tea-500 opacity-75"></span>
+                      <span id="solid-dot" class="relative inline-flex rounded-full h-3 w-3 bg-tea-600"></span>
+                    </span>
+                    <p class="text-sm font-serif font-extrabold text-tea-600" id="track-status">Menunggu Konfirmasi...</p>
+                </div>
+            </div>
+            <button id="btn-tutup-track" onclick="selesaikanTracking()" class="text-[10px] bg-white hover:bg-paper text-ink-500 px-3 py-2 rounded-xl border border-ink-900/10 transition shadow-sm">Tutup</button>
+        </div>
+        <!-- ======================================================== -->
+
         <h2 class="font-serif text-lg font-semibold text-ink-900 mb-3">Menu hari ini</h2>
 
         <?php if (!empty($pesanMuatProduk)): ?>
@@ -199,6 +230,34 @@ foreach ($produk as$p) {
     <script>
         let cart = {};
         const kartuRenderers = {};
+        let intervalTracking;
+
+        // Fungsi Memaparkan Notifikasi Toast Custom
+        function tampilkanNotifKustom(judul, pesan, ikon = '🔔') {
+            const toast = document.getElementById('toast-notif');
+            document.getElementById('toast-title').innerText = judul;
+            document.getElementById('toast-message').innerText = pesan;
+            document.getElementById('toast-icon').innerText = ikon;
+
+            // Kesan muncul
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.remove('-translate-y-10', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 10);
+
+            // Hilang secara automatik selepas 5 saat
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-10', 'opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 500);
+            }, 5000);
+        }
+
+        // Cek jika ada pesanan yang sedang dilacak saat halaman dimuat
+        window.onload = () => {
+            mulaiTracking();
+        }
 
         // Fungsi Membuka Modal Detail Gambar Produk
         function bukaDetailProduk(el) {
@@ -322,7 +381,15 @@ foreach ($produk as$p) {
             document.getElementById('langkah-keranjang').classList.remove('hidden');
             document.getElementById('langkah-sukses').classList.add('hidden');
             document.getElementById('modal-checkout').classList.remove('hidden');
+            
+            // Isi otomatis nama & rumah jika sebelumnya pernah pesan (dari fitur Live Tracking)
+            let dataLama = JSON.parse(localStorage.getItem('pelanggan_es_teh'));
+            if(dataLama) {
+                document.getElementById('nama').value = dataLama.nama || '';
+                document.getElementById('no_rumah').value = dataLama.rumah || '';
+            }
         }
+        
         function tutupModal() {
             document.getElementById('modal-checkout').classList.add('hidden');
         }
@@ -374,38 +441,159 @@ foreach ($produk as$p) {
                 itemsUntukServer[cart[id].nama] = { harga: cart[id].harga, jumlah: cart[id].jumlah };
             }
 
-            let data = {
-                nama: document.getElementById('nama').value,
-                no_rumah: document.getElementById('no_rumah').value,
-                no_hp: document.getElementById('no_hp').value,
-                catatan: document.getElementById('catatan').value,
+            let dataInput = {
+                nama: document.getElementById('nama').value.trim(),
+                no_rumah: document.getElementById('no_rumah').value.trim(),
+                no_hp: document.getElementById('no_hp').value.trim(),
+                catatan: document.getElementById('catatan').value.trim(),
                 items: itemsUntukServer
             };
 
             fetch('api.php?aksi=simpan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(dataInput)
             })
             .then(res => res.json())
             .then(response => {
                 if (response.status === 'sukses') {
                     document.getElementById('langkah-keranjang').classList.add('hidden');
                     document.getElementById('langkah-sukses').classList.remove('hidden');
+
+                    // Simpan identitas & ID pesanan ke memori HP pembeli untuk Live Tracking
+                    localStorage.setItem('pelanggan_es_teh', JSON.stringify({
+                        id_pesanan: response.pesanan_id, // <-- ID Pesanan disimpan di sini
+                        nama: dataInput.nama,
+                        rumah: dataInput.no_rumah,
+                        status_terakhir: 'Pending'
+                    }));
+                    
+                    mulaiTracking();
                 } else {
                     tombolKirim.disabled = false;
                     tombolKirim.innerText = 'Kirim Pesanan';
-                    alert('Gagal mengirim pesanan.');
+                    tampilkanNotifKustom('Gagal', 'Gagal mengirim pesanan.', '❌');
                 }
             })
-            .catch(() => {
-                tombolKirim.disabled = false;
-                tombolKirim.innerText = 'Kirim Pesanan';
-                alert('Kesalahan jaringan.');
-            });
         }
 
         function pesanLagi() { location.reload(); }
+
+        // ================= FUNGSI LIVE TRACKING =================
+        function mulaiTracking() {
+            let dataPelanggan = JSON.parse(localStorage.getItem('pelanggan_es_teh'));
+            if (dataPelanggan) {
+                document.getElementById('banner-tracking').classList.remove('hidden');
+                document.getElementById('track-nama').innerText = dataPelanggan.nama;
+                
+                // Cek status ke server setiap 3 detik
+                if(intervalTracking) clearInterval(intervalTracking);
+                intervalTracking = setInterval(() => cekStatusDiServer(dataPelanggan), 3000);
+                cekStatusDiServer(dataPelanggan);
+            }
+        }
+
+        function konfirmasiDiterima() {
+            let dataPelanggan = JSON.parse(localStorage.getItem('pelanggan_es_teh'));
+            
+            // Kirim status 'Diterima' ke database via API agar admin mendeteksi notifikasi
+            if (dataPelanggan && dataPelanggan.id_pesanan) {
+                fetch(`api.php?aksi=update_status&id=${dataPelanggan.id_pesanan}&status=Diterima`)
+                .then(res => res.json())
+                .catch(e => console.log(e));
+            }
+
+            let successSound = new Audio('https://assets.mixkit.co/active_storage/sfx/1114/1114-preview.mp3');
+            successSound.play().catch(e => console.log(e));
+            
+            tampilkanNotifKustom('Terima Kasih!', 'Pesanan telah diterima. Selamat menikmati!', '🥰');
+            selesaikanTracking();
+        }
+
+        function cekStatusDiServer(pelanggan) {
+            fetch('api.php?aksi=ambil_pesanan')
+            .then(res => res.json())
+            .then(data => {
+                // Cari pesanan dari daftar terbaru menggunakan reverse() 
+                let pesananSaya = data.reverse().find(p => p.nama_pembeli.toLowerCase() === pelanggan.nama.toLowerCase() && p.no_rumah.toLowerCase() === pelanggan.rumah.toLowerCase());
+                
+                let teksStatus = document.getElementById('track-status');
+                let dotPing = document.getElementById('ping-dot');
+                let dotSolid = document.getElementById('solid-dot');
+                let btnTutupTrack = document.getElementById('btn-tutup-track');
+
+                if (pesananSaya && pesananSaya.status !== 'Selesai') {
+                    let statusSekarang = pesananSaya.status;
+
+                    if (statusSekarang === 'Diproses') {
+                        teksStatus.innerText = 'Sedang Diproses 🍳';
+                        teksStatus.className = 'text-sm font-serif font-extrabold text-brand-800';
+                        dotPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-800 opacity-75';
+                        dotSolid.className = 'relative inline-flex rounded-full h-3 w-3 bg-brand-800';
+                    } else {
+                        teksStatus.innerText = 'Menunggu Konfirmasi ⏳';
+                        teksStatus.className = 'text-sm font-serif font-extrabold text-tea-600';
+                        dotPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-tea-500 opacity-75';
+                        dotSolid.className = 'relative inline-flex rounded-full h-3 w-3 bg-tea-600';
+                    }
+
+                    // Tampilan tombol standar saat belum selesai
+                    btnTutupTrack.innerText = 'Tutup';
+                    btnTutupTrack.className = 'text-[10px] bg-white hover:bg-paper text-ink-500 px-3 py-2 rounded-xl border border-ink-900/10 transition shadow-sm';
+                    btnTutupTrack.onclick = selesaikanTracking;
+                    
+                    // JIKA ADMIN BARU SAJA KLIK PROSES
+                    if (statusSekarang === 'Diproses' && pelanggan.status_terakhir !== 'Diproses') {
+                        let notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/933/933-preview.mp3');
+                        notifSound.play().catch(e => console.log(e));
+                        
+                        tampilkanNotifKustom('Pesanan Diproses!', 'Yey! Pesanan sedang dibuat oleh Admin.', '👨‍🍳');
+                        
+                        pelanggan.status_terakhir = 'Diproses';
+                        localStorage.setItem('pelanggan_es_teh', JSON.stringify(pelanggan));
+                    }
+                } else {
+                    // JIKA PESANAN TIDAK ADA (Berarti API telah memindahkannya karena admin klik Selesai)
+                    // ATAU JIKA STATUSNYA SELESAI
+                    if (pelanggan.status_terakhir === 'Diproses' || pelanggan.status_terakhir === 'Pending' || pelanggan.status_terakhir === 'Selesai') {
+                        
+                        // Banner pelacakan berubah jadi biru "Sedang Diantar" (TIDAK HILANG)
+                        teksStatus.innerText = 'Sedang Diantar 🛵';
+                        teksStatus.className = 'text-sm font-serif font-extrabold text-blue-600';
+                        dotPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75';
+                        dotSolid.className = 'relative inline-flex rounded-full h-3 w-3 bg-blue-600';
+
+                        // Mengubah Tombol "Tutup" menjadi "Pesanan Diterima ✓"
+                        btnTutupTrack.innerText = 'Pesanan Diterima ✓';
+                        btnTutupTrack.className = 'text-xs bg-brand-800 hover:bg-brand-900 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg transition animate-pulse';
+                        btnTutupTrack.onclick = konfirmasiDiterima;
+
+                        // Mainkan suara & notifikasi toast HANYA sekali saat transisi pertama kali
+                        if (pelanggan.status_terakhir !== 'Selesai') {
+                            let notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/933/933-preview.mp3');
+                            notifSound.play().catch(e => console.log(e));
+                            
+                            tampilkanNotifKustom('Pesanan Diantar!', 'Minuman Anda sedang dalam perjalanan ke rumah. Harap klik konfirmasi jika sudah diterima.', '🛵');
+                            
+                            pelanggan.status_terakhir = 'Selesai';
+                            localStorage.setItem('pelanggan_es_teh', JSON.stringify(pelanggan));
+                        }
+                        
+                        // Hentikan request interval ke server, biarkan menunggu pembeli klik terima
+                        clearInterval(intervalTracking);
+                    } else {
+                        // Jika status_terakhir kosong / error tak terduga
+                        selesaikanTracking();
+                    }
+                }
+            }).catch(e => console.log(e));
+        }
+
+        function selesaikanTracking() {
+            clearInterval(intervalTracking);
+            localStorage.removeItem('pelanggan_es_teh');
+            document.getElementById('banner-tracking').classList.add('hidden');
+        }
     </script>
 </body>
 </html>

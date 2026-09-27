@@ -26,7 +26,7 @@ if (isset($_POST['login'])) {
             <img src="logo.png" alt="Logo Es Teh Kemuning" class="w-20 h-20 object-contain">
         </div>
 
-        <h1 class="text-lg font-bold mb-4">Es Teh Kemuning</h1>
+        <h1 class="text-lg font-bold mb-4">Login Admin Kemuning</h1>
         
         <?php if(isset($error)) echo "<p class='text-red-400 text-xs text-center mb-3'>$error</p>"; ?>
         
