@@ -32,11 +32,12 @@ foreach ($produk as$p) {
     <header class="bg-[#2D4A3E] text-white p-5 rounded-b-[2.5rem] shadow-lg sticky top-0 z-20">
         <div class="flex justify-between items-center">
             <div>
-                <span class="text-xs bg-[#4A7062] px-3 py-1 rounded-full font-medium">📍 Antar ke Rumah Warga</span>
+                <span class="text-xs bg-[#4A7062] px-3 py-1 rounded-full font-medium">📍 Perum Panghegar</span>
                 <h1 class="text-xl font-bold mt-1">Es Teh Kemuning 🍃</h1>
             </div>
-            <div class="bg-white/10 p-2.5 rounded-2xl backdrop-blur-md">
-                <span class="text-2xl">🧋</span>
+            <div class="bg-white/10 p-2.5 rounded-2xl backdrop-blur-md flex items-center justify-center">
+    <img src="logo.png" alt="Logo Es Teh Kemuning" class="w-8 h-8 object-contain">
+</div>
             </div>
         </div>
     </header>
