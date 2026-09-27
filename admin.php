@@ -1,4 +1,28 @@
 <?php
+date_default_timezone_set('Asia/Jakarta'); // WIB (UTC+7) — supaya semua fungsi date()/strtotime() di halaman ini pakai jam Indonesia, bukan default server (biasanya UTC)
+
+// =====================================================================
+// PATCH SEMENTARA — KOMPENSASI JAM
+// Kolom "waktu" di database ternyata tersimpan memakai UTC, padahal
+// harusnya WIB (Asia/Jakarta = UTC+7). Selisihnya persis 7 jam
+// (contoh: jam asli 13:35 WIB kemarin malah muncul 06:30 di web).
+// Baris di bawah ini menambah 7 jam HANYA SAAT MENAMPILKAN jam,
+// tanpa mengubah data asli di database.
+//
+// PENTING: kalau nanti skrip yang MENYIMPAN pesanan (biasanya api.php)
+// sudah diperbaiki supaya langsung mencatat jam WIB yang benar,
+// SELISIH_JAM_WAKTU di bawah ini harus diubah jadi 0 (atau baris
+// patch ini dihapus), kalau tidak nanti jamnya malah maju 7 jam kebalik.
+// =====================================================================
+define('SELISIH_JAM_WAKTU', 7 * 3600);
+
+function waktuTampil($waktuMentah) {
+    if (empty($waktuMentah)) return time();
+    $ts = strtotime($waktuMentah);
+    if ($ts === false) return time();
+    return $ts + SELISIH_JAM_WAKTU;
+}
+
 session_start();
 if (!isset($_SESSION['admin_logged']) || $_SESSION['admin_logged'] !== true) {
     header('Location: login.php');
@@ -106,6 +130,17 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
 </head>
 <body class="bg-slate-900 text-slate-100 pb-24">
 
+    <!-- Toast Notifikasi Admin -->
+    <div id="toast-admin" class="fixed top-6 left-1/2 -translate-x-1/2 z-[70] hidden transition-all duration-500 transform -translate-y-10 opacity-0 pointer-events-none w-max max-w-[90vw]">
+        <div class="bg-slate-800 backdrop-blur-md px-5 py-3.5 rounded-2xl shadow-2xl border border-emerald-500/30 flex items-center gap-3">
+            <div id="toast-admin-icon" class="text-2xl shrink-0 bg-emerald-500/15 w-10 h-10 flex items-center justify-center rounded-full">📦</div>
+            <div>
+                <h4 id="toast-admin-title" class="font-bold text-sm text-white">Pemberitahuan</h4>
+                <p id="toast-admin-message" class="text-xs text-slate-300 mt-0.5">Pesan notifikasi di sini.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Header Admin -->
     <header class="bg-slate-800 p-4 border-b border-slate-700 sticky top-0 z-20 flex justify-between items-center shadow-md">
         <div>
@@ -149,7 +184,7 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                     echo '<div class="bg-red-500/10 border border-red-500/30 text-red-300 text-xs p-3 rounded-xl mb-3">Koneksi database ($pdo) tidak tersedia.</div>';
                 } else {
                     try {
-                        $stmt = $pdo->query("SELECT * FROM pesanan WHERE status = 'Selesai' ORDER BY id DESC LIMIT 20");
+                        $stmt = $pdo->query("SELECT * FROM pesanan WHERE status IN ('Selesai', 'Diterima') ORDER BY id DESC LIMIT 20");
                         $selesaiList = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     } catch (\Throwable $e) {
                         echo '<div class="bg-red-500/10 border border-red-500/30 text-red-300 text-xs p-3 rounded-xl mb-3">Gagal mengambil data riwayat: ' . htmlspecialchars($e->getMessage()) . '</div>';
@@ -158,7 +193,7 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
 
                 function labelTanggalHistory($waktu) {
                     if (empty($waktu)) return 'Tanggal Tidak Diketahui';
-                    $ts = strtotime($waktu);
+                    $ts = waktuTampil($waktu);
                     if ($ts === false) return 'Tanggal Tidak Diketahui';
                     $tglData = date('Y-m-d', $ts);
                     if ($tglData === date('Y-m-d')) return 'Hari Ini';
@@ -228,7 +263,7 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                                                             <?php endif; ?>
                                                         </p>
                                                     </div>
-                                                    <span class="text-[10px] font-bold text-slate-500 shrink-0"><?= htmlspecialchars(date('H:i', strtotime($p['waktu'] ?? 'now'))) ?></span>
+                                                    <span class="text-[10px] font-bold text-slate-500 shrink-0"><?= htmlspecialchars(date('H:i', waktuTampil($p['waktu'] ?? null))) ?></span>
                                                 </div>
 
                                                 <div class="flex flex-wrap gap-1.5 mt-2.5">
@@ -275,10 +310,15 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
 
                     <?php
                     $pilihTanggal = isset($_GET['tanggal']) ? $_GET['tanggal'] : date('Y-m-d');
-                    
+
+                    // Batas awal & akhir hari WIB, dikonversi ke "jam versi database" (UTC)
+                    // supaya cocok dengan data waktu yang tersimpan mundur 7 jam.
+                    $batasAwal  = gmdate('Y-m-d H:i:s', strtotime($pilihTanggal . ' 00:00:00'));
+                    $batasAkhir = gmdate('Y-m-d H:i:s', strtotime($pilihTanggal . ' 00:00:00') + 86400);
+
                     // Query Omzet & Total Pesanan Selesai berdasarkan Tanggal
-                    $qOmzet = $pdo->prepare("SELECT SUM(total) as omzet, COUNT(*) as jml FROM pesanan WHERE status = 'Selesai' AND DATE(waktu) = ?");
-                    $qOmzet->execute([$pilihTanggal]);
+                    $qOmzet = $pdo->prepare("SELECT SUM(total) as omzet, COUNT(*) as jml FROM pesanan WHERE status IN ('Selesai', 'Diterima') AND waktu >= ? AND waktu < ?");
+                    $qOmzet->execute([$batasAwal, $batasAkhir]);
                     $resOmzet = $qOmzet->fetch(PDO::FETCH_ASSOC);
                     ?>
                     <div class="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 gap-3 text-center">
@@ -298,8 +338,8 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                     <div class="space-y-2 text-xs">
                         <?php
                         // Query Menu Terlaris berdasarkan Tanggal via Relasi Tabel Pesanan yang Selesai
-                        $qLaris = $pdo->prepare("SELECT d.nama_menu, SUM(d.jumlah) as total_terjual FROM detail_pesanan d JOIN pesanan p ON d.pesanan_id = p.id WHERE p.status = 'Selesai' AND DATE(p.waktu) = ? GROUP BY d.nama_menu ORDER BY total_terjual DESC LIMIT 5");
-                        $qLaris->execute([$pilihTanggal]);
+                        $qLaris = $pdo->prepare("SELECT d.nama_menu, SUM(d.jumlah) as total_terjual FROM detail_pesanan d JOIN pesanan p ON d.pesanan_id = p.id WHERE p.status IN ('Selesai', 'Diterima') AND p.waktu >= ? AND p.waktu < ? GROUP BY d.nama_menu ORDER BY total_terjual DESC LIMIT 5");
+                        $qLaris->execute([$batasAwal, $batasAkhir]);
                         $menuLaris = $qLaris->fetchAll(PDO::FETCH_ASSOC);
                         
                         if (empty($menuLaris)) {
@@ -323,8 +363,8 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                     <div class="space-y-2 text-xs">
                         <?php
                         // Query Pelanggan Loyal berdasarkan Tanggal
-                        $qPelanggan = $pdo->prepare("SELECT nama_pembeli, no_rumah, COUNT(*) as total_pesanan FROM pesanan WHERE status = 'Selesai' AND DATE(waktu) = ? GROUP BY nama_pembeli, no_rumah ORDER BY total_pesanan DESC LIMIT 5");
-                        $qPelanggan->execute([$pilihTanggal]);
+                        $qPelanggan = $pdo->prepare("SELECT nama_pembeli, no_rumah, COUNT(*) as total_pesanan FROM pesanan WHERE status IN ('Selesai', 'Diterima') AND waktu >= ? AND waktu < ? GROUP BY nama_pembeli, no_rumah ORDER BY total_pesanan DESC LIMIT 5");
+                        $qPelanggan->execute([$batasAwal, $batasAkhir]);
                         $pelangganSetia = $qPelanggan->fetchAll(PDO::FETCH_ASSOC);
 
                         if (empty($pelangganSetia)) {
@@ -504,6 +544,25 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
     <script>
         let audioCtx = null;
 
+        function tampilkanToastAdmin(judul, pesan, ikon = '🔔') {
+            const toast = document.getElementById('toast-admin');
+            document.getElementById('toast-admin-title').innerText = judul;
+            document.getElementById('toast-admin-message').innerText = pesan;
+            document.getElementById('toast-admin-icon').innerText = ikon;
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.remove('-translate-y-10', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-10', 'opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 500);
+            }, 5000);
+        }
+
         function aktifkanAudio() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             mainkanAlarmKeras();
@@ -534,6 +593,7 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
     <?php if ($tab == 'pesanan'): ?>
     <script>
         let lastPendingCount = -1;
+        let statusSebelumnya = {}; // { id_pesanan: status_terakhir_yang_pernah_terlihat }
 
         function ambilPesanan() {
             fetch('api.php?aksi=ambil_pesanan')
@@ -549,6 +609,16 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                     mainkanAlarmKeras();
                 }
                 lastPendingCount = pendingCount;
+
+                // --- Notifikasi saat pembeli konfirmasi pesanan sudah diterima ---
+                data.forEach(p => {
+                    const statusLama = statusSebelumnya[p.id];
+                    if (p.status === 'Diterima' && statusLama !== undefined && statusLama !== 'Diterima') {
+                        mainkanAlarmKeras();
+                        tampilkanToastAdmin('Pesanan Diterima ✓', `${p.nama_pembeli} (${p.no_rumah}) sudah mengonfirmasi pesanan diterima.`, '📦');
+                    }
+                    statusSebelumnya[p.id] = p.status;
+                });
 
                 if (activeList.length === 0) {
                     container.innerHTML = `<div class="text-center py-20 text-slate-500"><p class="text-3xl mb-2">🍃</p> Belum ada pesanan aktif.</div>`;

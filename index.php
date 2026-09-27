@@ -231,6 +231,7 @@ foreach ($produk as $p) {
         let cart = {};
         const kartuRenderers = {};
         let intervalTracking;
+        let timerAutoTerima = null; // timer 2 menit: auto-konfirmasi "diterima" kalau pembeli tidak klik manual
 
         // Fungsi Memaparkan Notifikasi Toast Custom
         function tampilkanNotifKustom(judul, pesan, ikon = '🔔') {
@@ -460,6 +461,10 @@ foreach ($produk as $p) {
                     document.getElementById('langkah-keranjang').classList.add('hidden');
                     document.getElementById('langkah-sukses').classList.remove('hidden');
 
+                    // Pesanan baru dikirim -> batalkan timer auto-konfirmasi milik pesanan SEBELUMNYA
+                    // (kalau ada) supaya tidak salah menembak pesanan yang baru ini.
+                    if (timerAutoTerima) { clearTimeout(timerAutoTerima); timerAutoTerima = null; }
+
                     // Simpan identitas & ID pesanan ke memori HP pembeli untuk Live Tracking
                     localStorage.setItem('pelanggan_es_teh', JSON.stringify({
                         id_pesanan: response.pesanan_id, // <-- ID Pesanan disimpan di sini
@@ -494,6 +499,9 @@ foreach ($produk as $p) {
         }
 
         function konfirmasiDiterima() {
+            // Batalkan timer auto-konfirmasi 2 menit karena pembeli sudah klik manual duluan
+            if (timerAutoTerima) { clearTimeout(timerAutoTerima); timerAutoTerima = null; }
+
             let dataPelanggan = JSON.parse(localStorage.getItem('pelanggan_es_teh'));
             
             // Kirim status 'Diterima' ke database via API agar admin mendeteksi notifikasi
@@ -514,8 +522,18 @@ foreach ($produk as $p) {
             fetch('api.php?aksi=ambil_pesanan')
             .then(res => res.json())
             .then(data => {
-                // Cari pesanan dari daftar terbaru menggunakan reverse() 
-                let pesananSaya = data.reverse().find(p => p.nama_pembeli.toLowerCase() === pelanggan.nama.toLowerCase() && p.no_rumah.toLowerCase() === pelanggan.rumah.toLowerCase());
+                // Cocokkan berdasarkan ID pesanan (paling akurat & tidak mungkin salah).
+                // ID ini sudah disimpan sejak pesanan pertama kali dikirim (lihat kirimPesanan()).
+                let pesananSaya = null;
+                if (pelanggan.id_pesanan) {
+                    pesananSaya = data.find(p => String(p.id) === String(pelanggan.id_pesanan));
+                }
+
+                // Fallback lama (nama + alamat) hanya dipakai kalau ID belum tersedia,
+                // misalnya untuk pelanggan yang sempat menyimpan data sebelum perbaikan ini.
+                if (!pesananSaya) {
+                    pesananSaya = data.slice().reverse().find(p => p.nama_pembeli.toLowerCase() === pelanggan.nama.toLowerCase() && p.no_rumah.toLowerCase() === pelanggan.rumah.toLowerCase());
+                }
                 
                 let teksStatus = document.getElementById('track-status');
                 let dotPing = document.getElementById('ping-dot');
@@ -577,6 +595,20 @@ foreach ($produk as $p) {
                             
                             pelanggan.status_terakhir = 'Selesai';
                             localStorage.setItem('pelanggan_es_teh', JSON.stringify(pelanggan));
+
+                            // Kalau dalam 2 menit pembeli tidak klik "Pesanan Diterima" secara manual,
+                            // anggap otomatis sudah diterima (supaya pesanan tidak menggantung terus).
+                            // Simpan ID pesanan yang dituju timer ini secara spesifik, supaya kalau
+                            // pembeli keburu pesan lagi (pesanan baru) sebelum 2 menit habis,
+                            // timer lama TIDAK salah menembak pesanan yang baru itu.
+                            const idPesananUntukTimerIni = pelanggan.id_pesanan;
+                            if (timerAutoTerima) clearTimeout(timerAutoTerima);
+                            timerAutoTerima = setTimeout(() => {
+                                let dataTerkini = JSON.parse(localStorage.getItem('pelanggan_es_teh'));
+                                if (dataTerkini && String(dataTerkini.id_pesanan) === String(idPesananUntukTimerIni)) {
+                                    konfirmasiDiterima();
+                                }
+                            }, 2 * 60 * 1000);
                         }
                         
                         // Hentikan request interval ke server, biarkan menunggu pembeli klik terima
@@ -591,6 +623,7 @@ foreach ($produk as $p) {
 
         function selesaikanTracking() {
             clearInterval(intervalTracking);
+            if (timerAutoTerima) { clearTimeout(timerAutoTerima); timerAutoTerima = null; }
             localStorage.removeItem('pelanggan_es_teh');
             document.getElementById('banner-tracking').classList.add('hidden');
         }
