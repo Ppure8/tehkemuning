@@ -35,8 +35,8 @@ foreach ($produk as$p) {
                 <span class="text-xs bg-[#4A7062] px-3 py-1 rounded-full font-medium">📍 Perum Panghegar</span>
                 <h1 class="text-xl font-bold mt-1">Es Teh Kemuning 🍃</h1>
             </div>
-            <div class="bg-white/10 p-2.5 rounded-2xl backdrop-blur-md flex items-center justify-center">
-    <img src="logo.png" alt="Logo Es Teh Kemuning" class="w-8 h-8 object-contain">
+            <div class="bg-white/10 p-2 rounded-2xl backdrop-blur-md flex items-center justify-center">
+    <img src="logo.png" alt="Logo Es Teh Kemuning" class="w-12 h-12 object-contain">
 </div>
             </div>
         </div>
