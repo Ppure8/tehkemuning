@@ -274,8 +274,11 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                     </form>
 
                     <?php
-                    $qOmzet = $pdo->prepare("SELECT SUM(total) as omzet, COUNT(*) as jml FROM pesanan WHERE status = 'Selesai'");
-                    $qOmzet->execute();
+                    $pilihTanggal = isset($_GET['tanggal']) ? $_GET['tanggal'] : date('Y-m-d');
+                    
+                    // Query Omzet & Total Pesanan Selesai berdasarkan Tanggal
+                    $qOmzet = $pdo->prepare("SELECT SUM(total) as omzet, COUNT(*) as jml FROM pesanan WHERE status = 'Selesai' AND DATE(waktu) = ?");
+                    $qOmzet->execute([$pilihTanggal]);
                     $resOmzet = $qOmzet->fetch(PDO::FETCH_ASSOC);
                     ?>
                     <div class="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 gap-3 text-center">
@@ -291,30 +294,43 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                 </div>
 
                 <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                    <h2 class="text-xs font-bold text-amber-400 mb-3">🏆 Menu Paling Laris</h2>
+                    <h2 class="text-xs font-bold text-amber-400 mb-3">🏆 Menu Paling Laris (Tanggal <?= date('d/m/Y', strtotime($pilihTanggal)) ?>)</h2>
                     <div class="space-y-2 text-xs">
                         <?php
-                        $qLaris = $pdo->query("SELECT nama_menu, SUM(jumlah) as total_terjual FROM detail_pesanan GROUP BY nama_menu ORDER BY total_terjual DESC LIMIT 5");
+                        // Query Menu Terlaris berdasarkan Tanggal via Relasi Tabel Pesanan yang Selesai
+                        $qLaris = $pdo->prepare("SELECT d.nama_menu, SUM(d.jumlah) as total_terjual FROM detail_pesanan d JOIN pesanan p ON d.pesanan_id = p.id WHERE p.status = 'Selesai' AND DATE(p.waktu) = ? GROUP BY d.nama_menu ORDER BY total_terjual DESC LIMIT 5");
+                        $qLaris->execute([$pilihTanggal]);
                         $menuLaris = $qLaris->fetchAll(PDO::FETCH_ASSOC);
-                        if (empty($menuLaris)) echo '<p class="text-slate-500 text-center py-3">Belum ada data penjualan menu.</p>';
-                        foreach ($menuLaris as $ml):
+                        
+                        if (empty($menuLaris)) {
+                            echo '<p class="text-slate-500 text-center py-3">Belum ada data penjualan menu pada tanggal ini.</p>';
+                        } else {
+                            foreach ($menuLaris as $ml):
                         ?>
                         <div class="flex justify-between items-center bg-slate-900/50 p-2.5 rounded-xl">
                             <span class="text-white font-medium">🥤 <?= htmlspecialchars($ml['nama_menu']) ?></span>
                             <span class="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg font-bold"><?= $ml['total_terjual'] ?> Terjual</span>
                         </div>
-                        <?php endforeach; ?>
+                        <?php 
+                            endforeach;
+                        } 
+                        ?>
                     </div>
                 </div>
 
                 <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                    <h2 class="text-xs font-bold text-amber-400 mb-3">👑 Pelanggan Sering Beli (Loyal)</h2>
+                    <h2 class="text-xs font-bold text-amber-400 mb-3">👑 Pelanggan Sering Beli (Tanggal <?= date('d/m/Y', strtotime($pilihTanggal)) ?>)</h2>
                     <div class="space-y-2 text-xs">
                         <?php
-                        $qPelanggan = $pdo->query("SELECT nama_pembeli, no_rumah, COUNT(*) as total_pesanan FROM pesanan GROUP BY nama_pembeli, no_rumah ORDER BY total_pesanan DESC LIMIT 5");
+                        // Query Pelanggan Loyal berdasarkan Tanggal
+                        $qPelanggan = $pdo->prepare("SELECT nama_pembeli, no_rumah, COUNT(*) as total_pesanan FROM pesanan WHERE status = 'Selesai' AND DATE(waktu) = ? GROUP BY nama_pembeli, no_rumah ORDER BY total_pesanan DESC LIMIT 5");
+                        $qPelanggan->execute([$pilihTanggal]);
                         $pelangganSetia = $qPelanggan->fetchAll(PDO::FETCH_ASSOC);
-                        if (empty($pelangganSetia)) echo '<p class="text-slate-500 text-center py-3">Belum ada data pelanggan.</p>';
-                        foreach ($pelangganSetia as $ps):
+
+                        if (empty($pelangganSetia)) {
+                            echo '<p class="text-slate-500 text-center py-3">Belum ada data pelanggan pada tanggal ini.</p>';
+                        } else {
+                            foreach ($pelangganSetia as $ps):
                         ?>
                         <div class="flex justify-between items-center bg-slate-900/50 p-2.5 rounded-xl">
                             <div>
@@ -323,7 +339,10 @@ if ($tab == 'produk' && isset($_GET['hapus'])) {
                             </div>
                             <span class="bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded-lg font-bold"><?= $ps['total_pesanan'] ?> Kali Pesan</span>
                         </div>
-                        <?php endforeach; ?>
+                        <?php 
+                            endforeach;
+                        } 
+                        ?>
                     </div>
                 </div>
             </div>
